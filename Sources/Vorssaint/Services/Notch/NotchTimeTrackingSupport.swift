@@ -3,13 +3,12 @@
 
 import AppKit
 
-/// A running time entry as a live activity of the closed island: its clock
+/// A running time entry as a live activity of the closed island: its icon
 /// left of the camera, and the time it has run so far on the right, as the
 /// menu bar item reads it.
 enum NotchTimeTrackingSupport {
-    /// A clock rather than the feature's stopwatch, which the island's own
-    /// timer already shows in its stopwatch mode.
-    static let symbol = "clock.fill"
+    /// The feature's own icon, which no other island activity uses.
+    static let symbol = AppFeature.timeTracking.symbolName
 
     /// On by default: an entry only runs when the person starts one, and the
     /// strip waits behind every activity that ends sooner.
@@ -30,7 +29,7 @@ enum NotchTimeTrackingSupport {
         TimeTrackingFormat.nextMinuteBoundary(after: now, start: start).addingTimeInterval(-60)
     }
 
-    /// The wider of the two sides, the clock or the reading, drawn as the
+    /// The wider of the two sides, the icon or the reading, drawn as the
     /// strip draws them, with the timer's clearance from the silhouette's
     /// curve and air beside the camera. No entry measures a fresh one.
     static func stripWing(start: Date?, now: Date, in geometry: NotchGeometry) -> CGFloat {

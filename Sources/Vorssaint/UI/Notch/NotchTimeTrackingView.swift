@@ -3,10 +3,10 @@
 
 import SwiftUI
 
-/// The closed island while a time entry runs: a clock left of the camera,
+/// The closed island while a time entry runs: its icon left of the camera,
 /// and on the right the time the entry has run, as the menu bar item reads
-/// it. Both open the Time Tracking page. The wings
-/// are as wide as the wider side needs.
+/// it. Both open the Time Tracking page. The wings are as wide as the wider
+/// side needs.
 struct NotchTimeTrackingStrip: View {
     @ObservedObject var service: NotchService
     /// Where the island draws it: its own strip as of the last update, or
@@ -78,7 +78,7 @@ struct NotchTimeTrackingStrip: View {
         .accessibilityIdentifier("notch.timeTracking")
     }
 
-    /// The module's own colour in the island editor, so the clock is told
+    /// The module's own colour in the island editor, so the icon is told
     /// apart from the timer's orange and Keep Awake's yellow.
     static let tint = Color(red: 0.6, green: 0.76, blue: 0.2)
 

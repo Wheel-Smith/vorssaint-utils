@@ -718,9 +718,8 @@ struct NotchCapsuleKeepAwakeStrip: View {
     }
 }
 
-/// A running time entry: a clock, then the time it
-/// has run so far. The reading changes once a minute, so the clock wakes
-/// only then.
+/// A running time entry: its icon, then the time it has run so far. The
+/// reading changes once a minute, so the clock wakes only then.
 struct NotchCapsuleTimeTrackingStrip: View {
     @ObservedObject var service: NotchService
     let size: CGSize
