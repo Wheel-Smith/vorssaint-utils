@@ -429,7 +429,7 @@ private struct NotchCapsuleCompanionMark: View {
                     NotchCapsuleCalendarStrip.clockMark(countdown, now: context.date)
                 }
             }
-        case .timer, .keepAwake, .watch:
+        case .timer, .keepAwake, .watch, .timeTracking:
             EmptyView()
         }
     }
@@ -715,6 +715,57 @@ struct NotchCapsuleKeepAwakeStrip: View {
         .accessibilityValue(NotchKeepAwakeStrip.status(end: end, language: l10n.language))
         .accessibilityHint(FeatureStrings.notch(l10n.language).open)
         .accessibilityIdentifier("notch.keepAwake")
+    }
+}
+
+/// A running time entry: a clock, then the time it
+/// has run so far. The reading changes once a minute, so the clock wakes
+/// only then.
+struct NotchCapsuleTimeTrackingStrip: View {
+    @ObservedObject var service: NotchService
+    let size: CGSize
+    /// Another display's capsule, when the island shows on every display.
+    var displayGeometry: NotchGeometry? = nil
+    @ObservedObject private var tracking = TimeTrackingService.shared
+    @ObservedObject private var l10n = L10n.shared
+
+    var body: some View {
+        // Stopping clears the entry before the strip has left.
+        NotchStripHold(tracking.running, shows: tracking.running != nil) { entry in
+            if let entry {
+                TimelineView(.periodic(from: NotchTimeTrackingSupport.tickStart(since: entry.start, now: Date()),
+                                       by: 60)) { context in
+                    row(entry, now: context.date)
+                }
+            }
+        }
+    }
+
+    private func row(_ entry: TimeEntry, now: Date) -> some View {
+        let text = NotchTimeTrackingSupport.compactText(since: entry.start, now: now)
+        return NotchCapsuleRow(size: size, geometry: displayGeometry ?? service.geometry) {
+            HStack(spacing: CapsuleLayout.spacing) {
+                // Measured as drawn, like Keep Awake's cup.
+                Image(systemName: NotchTimeTrackingSupport.symbol)
+                    .font(.system(size: CapsuleLayout.symbolSize, weight: .medium))
+                    .foregroundStyle(NotchTimeTrackingStrip.tint)
+                    .capsuleCentred(NotchTimeTrackingSupport.symbol)
+                Text(text)
+                    .font(Font(CapsuleLayout.readingFont as CTFont))
+                    .foregroundStyle(.white)
+                    .lineLimit(1).fixedSize()
+                    // A reading that gains a character, like 9:59 becoming
+                    // 10:00, resizes the capsule; the service measures the same.
+                    .onChange(of: NotchAgentSupport.readingShape(text)) { _, _ in
+                        DispatchQueue.main.async { service.refreshPresentation() }
+                    }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(NotchTimeTrackingStrip.label(entry, language: l10n.language))
+        .accessibilityValue(text)
+        .accessibilityHint(FeatureStrings.notch(l10n.language).open)
+        .accessibilityIdentifier("notch.timeTracking")
     }
 }
 

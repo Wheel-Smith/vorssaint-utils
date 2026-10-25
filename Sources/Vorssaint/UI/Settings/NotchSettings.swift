@@ -98,6 +98,8 @@ struct NotchSettings: View {
     @AppStorage(DefaultsKey.notchAppPanel) private var appPanel = false
     @AppStorage(DefaultsKey.notchHidesMenuBarIcon) private var hidesMenuBarIcon = false
     @AppStorage(DefaultsKey.notchKeepAwakeActivity) private var keepAwakeActivity = false
+    @AppStorage(DefaultsKey.notchTimeTrackingActivity) private var timeTrackingActivity = true
+    @AppStorage(DefaultsKey.timeTrackingFollowsPomodoro) private var timeTrackingFollowsPomodoro = true
     @AppStorage(DefaultsKey.notchScratchpad) private var scratchpad = true
     @AppStorage(DefaultsKey.brightnessControlEnabled) private var brightnessControlEnabled = false
     @AppStorage(DefaultsKey.clipboardHistoryEnabled) private var clipboardHistoryEnabled = false
@@ -130,7 +132,8 @@ struct NotchSettings: View {
          String(microphone), String(battery), String(clipboard), String(clipboardWindow), clipboardCardSize,
          String(capture), String(trackChange), captureAction, String(showInCaptures),
          String(returnHome), homeModule, String(opensActivity), String(scratchpad),
-         String(agentsEnabled), String(watchEnabled), String(keepAwakeActivity), String(shortcutEnabled)]
+         String(agentsEnabled), String(watchEnabled), String(keepAwakeActivity), String(shortcutEnabled),
+         String(timeTrackingActivity), String(timeTrackingFollowsPomodoro)]
     }
 
     private var access: Binding<NotchQuickAccessConfiguration> {
@@ -530,6 +533,14 @@ struct NotchSettings: View {
         case .watch:
             NotchWatchSettingsControls()
                 .toggleStyle(TrailingSwitchToggleStyle())
+        case .timeTracking:
+            let island = FeatureStrings.timeTrackingIsland(l10n.language)
+            switchRow(NotchTimeTrackingSupport.symbol, island.activity, caption: island.activityHint,
+                      isOn: $timeTrackingActivity)
+            // The Pomodoro is the island timer's, so the link needs it installed too.
+            SettingsFeatureSwitchRow(symbol: NotchModule.timer.symbol, title: island.followsPomodoro,
+                                     caption: island.followsPomodoroHint, isOn: $timeTrackingFollowsPomodoro,
+                                     feature: .notchTimer)
         case .mixer, .system, .tools:
             EmptyView()
         }
@@ -869,6 +880,7 @@ struct NotchSettings: View {
         case .scratchpad: return .scratchpad
         case .agents: return .notchAgents
         case .watch: return .notchWatch
+        case .timeTracking: return .timeTracking
         }
     }
 

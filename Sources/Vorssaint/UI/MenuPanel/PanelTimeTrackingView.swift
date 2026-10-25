@@ -12,13 +12,14 @@ struct PanelTimeTrackingView: View {
     @State private var renamingID: UUID?
     @State private var renameText = ""
 
-    var onClose: () -> Void
+    /// nil on the island's own page, whose band already names it.
+    var onClose: (() -> Void)? = nil
 
     private var strings: TimeTrackingFeatureStrings { FeatureStrings.timeTracking(l10n.language) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            header
+            if let onClose { header(onClose) }
             if service.saveFailed {
                 Label(strings.saveFailed, systemImage: "exclamationmark.triangle")
                     .font(.system(size: 10.5)).foregroundStyle(.secondary)
@@ -33,20 +34,23 @@ struct PanelTimeTrackingView: View {
             }
             totalsCard
             recentList
-            Toggle(strings.showInMenuBar, isOn: $showsMenuBarTimer)
-                .toggleStyle(.checkbox)
-                .font(.system(size: 10.5))
+            if onClose != nil {
+                Toggle(strings.showInMenuBar, isOn: $showsMenuBarTimer)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 10.5))
+            }
         }
-        .onAppear { PanelInteractionState.shared.viewKeepsPopoverOpen = true }
+        // The island's own page is not in the popover, so it must not hold it.
+        .onAppear { if onClose != nil { PanelInteractionState.shared.viewKeepsPopoverOpen = true } }
         .onDisappear {
-            PanelInteractionState.shared.viewKeepsPopoverOpen = false
+            if onClose != nil { PanelInteractionState.shared.viewKeepsPopoverOpen = false }
             // Escape on the island steps back before the field sees it.
             renamingID = nil
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var header: some View {
+    private func header(_ onClose: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             Label(strings.title, systemImage: AppFeature.timeTracking.symbolName)
                 .font(.system(size: 12, weight: .semibold))

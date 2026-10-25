@@ -314,6 +314,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Notch/NotchNotificationReaderCore.swift
         Sources/Vorssaint/Services/Notch/NotchCalendarSupport.swift
         Sources/Vorssaint/Services/Notch/NotchKeepAwakeSupport.swift
+        Sources/Vorssaint/Services/Notch/NotchTimeTrackingSupport.swift
         Sources/Vorssaint/Services/Notch/NotchSupport.swift
         Sources/Vorssaint/Services/Notch/NotchAudioLevelSupport.swift
         Sources/Vorssaint/Services/Notch/NotchVolumeKeyGate.swift
@@ -410,6 +411,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/KillProcessStrings.swift
         Sources/Vorssaint/Core/PortManagerStrings.swift
         Sources/Vorssaint/Core/TimeTrackingStrings.swift
+        Sources/Vorssaint/Core/TimeTrackingIslandStrings.swift
         Sources/Vorssaint/Core/WhatsAppDownloadStrings.swift
         Sources/Vorssaint/Core/WhatsAppOrganizerStrings.swift
         Sources/Vorssaint/Core/ReleaseNotes.swift

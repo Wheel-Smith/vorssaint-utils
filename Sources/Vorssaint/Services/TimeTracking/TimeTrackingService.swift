@@ -37,6 +37,10 @@ final class TimeTrackingService: ObservableObject {
         mutate { $0.continueEntry(id, at: Date()) }
     }
 
+    func resumeLatest(fallback: String) {
+        mutate { $0.resumeLatest(at: Date(), fallback: fallback) }
+    }
+
     func rename(_ id: UUID, to description: String) {
         mutate { $0.rename(id, to: description) }
     }

@@ -524,6 +524,10 @@ final class NotchService: ObservableObject {
         NotchKeepAwakeSupport.showsActivity() && KeepAwakeManager.shared.isActive
     }
 
+    var hasTimeTrackingActivity: Bool {
+        NotchTimeTrackingSupport.showsActivity() && TimeTrackingService.shared.running != nil
+    }
+
     var compactActivity: NotchCompactActivity? {
         // A new song waiting for its notice is not drawn yet.
         activitySelection.current(available: awaitsTrackNotice ? compactActivities.filter { $0 != .music } : compactActivities)
@@ -532,7 +536,8 @@ final class NotchService: ObservableObject {
     var compactActivities: [NotchCompactActivity] {
         NotchSupport.compactActivities(timer: hasTimerActivity, watch: hasWatchActivity, downloads: hasDownloadActivity,
                                       agents: hasAgentActivity, calendar: hasCalendarActivity,
-                                      music: hasMusicActivity, keepAwake: hasKeepAwakeActivity)
+                                      music: hasMusicActivity, timeTracking: hasTimeTrackingActivity,
+                                      keepAwake: hasKeepAwakeActivity)
     }
 
     var showsCompactActivityPicker: Bool {
@@ -658,6 +663,9 @@ final class NotchService: ObservableObject {
                                                     paired: companion != nil)
         // Its reading is a countdown like the timer's, so it takes the timer's wings.
         case .keepAwake: return geometry.compactTimerGeometry(showsDownloads: false, wing: keepAwakeStripWing(in: geometry))
+        // An entry's time so far reads like a timer, so it takes the timer's wings too.
+        case .timeTracking:
+            return geometry.compactTimerGeometry(showsDownloads: false, wing: timeTrackingStripWing(in: geometry))
         default: return geometry
         }
     }
@@ -679,6 +687,10 @@ final class NotchService: ObservableObject {
     private func keepAwakeStripWing(in geometry: NotchGeometry) -> CGFloat {
         NotchKeepAwakeSupport.stripWing(until: KeepAwakeManager.shared.endDate, now: Date(),
                                         locale: Locale(identifier: L10n.shared.language.rawValue), in: geometry)
+    }
+
+    private func timeTrackingStripWing(in geometry: NotchGeometry) -> CGFloat {
+        NotchTimeTrackingSupport.stripWing(start: TimeTrackingService.shared.running?.start, now: Date(), in: geometry)
     }
 
     /// The wider of the two sides, measured with the strip's fonts and its
@@ -1066,6 +1078,10 @@ final class NotchService: ObservableObject {
                 NotchKeepAwakeSupport.compactText(until: $0, now: Date(), locale: Locale(identifier: language.rawValue))
             }
             return layout.keepAwakeSurface(reading: reading, geometry: geometry)
+        case .timeTracking:
+            let start = TimeTrackingService.shared.running?.start ?? Date()
+            return layout.timeTrackingSurface(reading: NotchTimeTrackingSupport.compactText(since: start, now: Date()),
+                                              geometry: geometry)
         }
     }
 
@@ -1157,6 +1173,7 @@ final class NotchService: ObservableObject {
         let signature = NotchEvent.allCases.map { String(NotchSupport.routes($0)) }.joined()
             + NotchSupport.idleContent().rawValue + String(NotchSupport.watchesMusicActivity())
             + String(NotchKeepAwakeSupport.showsActivity())
+            + String(NotchTimeTrackingSupport.showsActivity()) + String(TimeTrackingPomodoroLink.isEnabled())
             + modules.map(\.rawValue).joined()
             + String(AppFeature.fanControl.isAvailable)
             + String(NotchSupport.routesShelf()) + String(NotchSupport.revealsShelfDrag())
@@ -4058,6 +4075,25 @@ final class NotchService: ObservableObject {
                     self?.objectWillChange.send()
                     self?.refreshPresentation()
                 }.store(in: &subscriptions)
+        }
+        if NotchTimeTrackingSupport.showsActivity() {
+            // An entry starting or stopping, or being renamed, which changes
+            // the strip, its label and the wings it needs.
+            TimeTrackingService.shared.$log.map(\.running).removeDuplicates()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.syncMenuSpaceMonitoring()
+                    self?.objectWillChange.send()
+                    self?.refreshPresentation()
+                }.store(in: &subscriptions)
+        }
+        if TimeTrackingPomodoroLink.isEnabled() {
+            // Pomodoro sessions live only while the island runs, so the link
+            // follows them from here.
+            TimeTrackingPomodoroLink.shared.reset()
+            NotchTimerService.shared.$session.receive(on: DispatchQueue.main)
+                .sink { TimeTrackingPomodoroLink.shared.follow($0) }
+                .store(in: &subscriptions)
         }
         if NotchSupport.routes(.agents) {
             AgentUsageService.shared.events.receive(on: DispatchQueue.main)

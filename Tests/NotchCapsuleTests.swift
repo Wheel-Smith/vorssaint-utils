@@ -65,6 +65,8 @@ enum NotchCapsuleTests {
             ("agents", Layout.agentSurface(reading: "1:02:33", working: 2, geometry: geometry)),
             ("keep awake", Layout.keepAwakeSurface(reading: "26h05", geometry: geometry)),
             ("keep awake without an end", Layout.keepAwakeSurface(reading: nil, geometry: geometry)),
+            ("time tracking", Layout.timeTrackingSurface(reading: "0:42", geometry: geometry)),
+            ("long time tracking", Layout.timeTrackingSurface(reading: "1000:00", geometry: geometry)),
             ("download", Layout.downloadSurface(name: "Installer.dmg", hasProgress: true, geometry: geometry, language: language)),
             ("long download", Layout.downloadSurface(name: long, hasProgress: false, geometry: geometry, language: language)),
             ("calendar", Layout.calendarSurface(title: "Design review", time: "· 19:15", geometry: geometry)),

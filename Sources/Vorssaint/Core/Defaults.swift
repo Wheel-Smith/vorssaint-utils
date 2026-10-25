@@ -741,6 +741,7 @@ enum DefaultsKey {
     static let panelUtilityPortManager = "panelUtilityPortManager"
     static let panelUtilityTimeTracking = "panelUtilityTimeTracking"
     static let timeTrackingMenuBarTimer = "timeTrackingMenuBarTimer" // running entry next to the menu bar icon
+    static let timeTrackingFollowsPomodoro = "timeTrackingFollowsPomodoro" // island Pomodoro focus phases run the latest entry
 
     // Window Layout — snapping, global shortcuts and optional pointer gestures.
     static let windowLayoutShortcutsEnabled = "windowLayoutShortcutsEnabled"
@@ -834,6 +835,7 @@ enum DefaultsKey {
     static let notchAppPanel = "notchAppPanel"
     static let notchHidesMenuBarIcon = "notchHidesMenuBarIcon" // the island takes the glyph's place while it is on
     static let notchKeepAwakeActivity = "notchKeepAwakeActivity" // a running Keep Awake session in the closed island
+    static let notchTimeTrackingActivity = "notchTimeTrackingActivity" // a running time entry in the closed island
     static let notchScratchpad = "notchScratchpad"
     static let notchHoverExpands = "notchHoverExpands"
     static let notchGesturesEnabled = "notchGesturesEnabled"
@@ -1439,6 +1441,7 @@ enum Defaults {
         DefaultsKey.notchAppPanel: false,
         DefaultsKey.notchHidesMenuBarIcon: false,
         DefaultsKey.notchKeepAwakeActivity: false,
+        DefaultsKey.notchTimeTrackingActivity: true,
         DefaultsKey.notchScratchpad: true,
         DefaultsKey.notchHoverExpands: true,
         DefaultsKey.notchGesturesEnabled: true,
@@ -1857,6 +1860,7 @@ enum Defaults {
         DefaultsKey.panelUtilityPortManager: true,
         DefaultsKey.panelUtilityTimeTracking: true,
         DefaultsKey.timeTrackingMenuBarTimer: true,
+        DefaultsKey.timeTrackingFollowsPomodoro: true,
         DefaultsKey.screenshotShowCaptureMenuOnShortcut: true,
         DefaultsKey.recorderShowCaptureMenuOnShortcut: true,
         DefaultsKey.screenOCRShowCaptureMenuOnShortcut: true,

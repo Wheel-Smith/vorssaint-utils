@@ -7,7 +7,7 @@ import Foundation
 import CoreGraphics
 
 enum NotchModule: String, CaseIterable, Identifiable {
-    case controls, mixer, music, clipboard, captures, files, system, tools, calendar, notifications, timer, camera, downloads, scratchpad, agents, watch
+    case controls, mixer, music, clipboard, captures, files, system, tools, calendar, notifications, timer, camera, downloads, scratchpad, agents, watch, timeTracking
     var id: String { rawValue }
 
     var symbol: String {
@@ -31,6 +31,7 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .scratchpad: return "note.text"
         case .agents: return "sparkles"
         case .watch: return "eye"
+        case .timeTracking: return AppFeature.timeTracking.symbolName
         }
     }
 
@@ -53,6 +54,7 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .scratchpad: return "p"
         case .agents: return "g"
         case .watch: return "o"
+        case .timeTracking: return "k"
         }
     }
 
@@ -76,6 +78,7 @@ enum NotchModule: String, CaseIterable, Identifiable {
         case .scratchpad: return AppFeature.scratchpad.isAvailable(in: defaults)
         case .agents: return AppFeature.notchAgents.isAvailable(in: defaults)
         case .watch: return AppFeature.notchWatch.isAvailable(in: defaults)
+        case .timeTracking: return AppFeature.timeTracking.isAvailable(in: defaults)
         case .system:
             return [.monitorCPU, .monitorGPU, .monitorMemory, .monitorNetwork,
                     .monitorDisk, .monitorPower, .fanControl, .connectedDevices].contains { (feature: AppFeature) in
@@ -823,7 +826,7 @@ enum NotchMusicStripLayout {
 }
 
 enum NotchCompactActivity: String, Identifiable {
-    case timer, watch, downloads, agents, calendar, music, keepAwake
+    case timer, watch, downloads, agents, calendar, music, timeTracking, keepAwake
 
     var id: String { rawValue }
 
@@ -835,6 +838,7 @@ enum NotchCompactActivity: String, Identifiable {
         case .agents: return FeatureStrings.notchAgents(language).title
         case .calendar: return FeatureStrings.notchCalendar(language).title
         case .music: return FeatureStrings.notch(language).music
+        case .timeTracking: return FeatureStrings.timeTracking(language).title
         case .keepAwake: return Strings.localized(language).keepAwakeTitle
         }
     }
@@ -848,12 +852,18 @@ enum NotchCompactActivity: String, Identifiable {
         case .agents: return .agents
         case .calendar: return .calendar
         case .music: return .music
+        case .timeTracking: return .timeTracking
         case .keepAwake: return .controls
         }
     }
 
+    /// The picker shows each activity by the mark its strip draws.
     var symbol: String {
-        self == .keepAwake ? NotchControlItem.keepAwake.symbol : module.symbol
+        switch self {
+        case .keepAwake: return NotchControlItem.keepAwake.symbol
+        case .timeTracking: return NotchTimeTrackingSupport.symbol
+        default: return module.symbol
+        }
     }
 }
 
@@ -1156,6 +1166,14 @@ enum NotchCapsuleLayout {
         let right = reading.map { width(NotchAgentSupport.readingShape($0), font: readingFont) }
             ?? NotchKeepAwakeSupport.symbolWidth(NotchKeepAwakeSupport.openSymbol, size: readingFont.pointSize) + air
         return surface(content: cup + spacing + right, maximum: Maximum.activity, geometry: geometry)
+    }
+
+    /// A running time entry: its clock, then the time it has run so far,
+    /// measured by its shape.
+    static func timeTrackingSurface(reading: String, geometry: NotchGeometry) -> CGSize {
+        let clock = NotchKeepAwakeSupport.symbolWidth(NotchTimeTrackingSupport.symbol, size: symbolSize)
+        let right = width(NotchAgentSupport.readingShape(reading), font: readingFont)
+        return surface(content: clock + spacing + right, maximum: Maximum.activity, geometry: geometry)
     }
 
     /// Working agents' marks and the reading the person chose.
@@ -1775,19 +1793,23 @@ enum NotchSupport {
 
     /// Automatic order until the user chooses one of the live activities.
     static func compactActivity(timer: Bool, downloads: Bool, agents: Bool = false,
-                                calendar: Bool = false, music: Bool, keepAwake: Bool = false) -> NotchCompactActivity? {
+                                calendar: Bool = false, music: Bool, timeTracking: Bool = false,
+                                keepAwake: Bool = false) -> NotchCompactActivity? {
         compactActivities(timer: timer, downloads: downloads, agents: agents,
-                          calendar: calendar, music: music, keepAwake: keepAwake).first
+                          calendar: calendar, music: music, timeTracking: timeTracking, keepAwake: keepAwake).first
     }
 
     /// Keep Awake comes last: a session can run all day, even more than
     /// music plays, and it only says that the Mac stays awake. A watch
     /// follows the timer: the person started both and is waiting on them.
+    /// A time entry also runs for hours, so it waits behind everything that
+    /// ends sooner, and only Keep Awake waits behind it.
     static func compactActivities(timer: Bool, watch: Bool = false, downloads: Bool, agents: Bool,
-                                  calendar: Bool, music: Bool, keepAwake: Bool = false) -> [NotchCompactActivity] {
+                                  calendar: Bool, music: Bool, timeTracking: Bool = false,
+                                  keepAwake: Bool = false) -> [NotchCompactActivity] {
         let candidates: [(Bool, NotchCompactActivity)] = [
             (timer, .timer), (watch, .watch), (downloads, .downloads), (agents, .agents),
-            (calendar, .calendar), (music, .music), (keepAwake, .keepAwake)
+            (calendar, .calendar), (music, .music), (timeTracking, .timeTracking), (keepAwake, .keepAwake)
         ]
         return candidates.compactMap { $0.0 ? $0.1 : nil }
     }
@@ -2766,7 +2788,8 @@ struct NotchGeometry: Equatable {
                 // Only the cards a person chose; a short set leaves a short island.
                 contentHeight = min(budget, agentsHeight.map { $0 > 0 ? $0 : NotchLayout.emptyHeight } ?? budget)
             // Lists and previews fill the chosen content budget.
-            case .mixer, .calendar, .clipboard, .captures, .files, .notifications, .downloads, .camera, .scratchpad, .watch:
+            case .mixer, .calendar, .clipboard, .captures, .files, .notifications, .downloads, .camera, .scratchpad, .watch,
+                 .timeTracking:
                 contentHeight = budget
             }
         }
