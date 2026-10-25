@@ -13,6 +13,7 @@ final class StatusItemController {
     var onRightClick: ((NSStatusBarButton?) -> Void)?
     var onMetricClick: ((MenuBarMetric, NSStatusBarButton) -> Void)?
     var onClipboardPreviewClick: (() -> Void)?
+    var onTimeTrackingClick: ((NSStatusBarButton) -> Void)?
 
     private(set) var statusItem: NSStatusItem!
     /// The optional "show latest copy" item: same shape as a metric item —
@@ -20,6 +21,12 @@ final class StatusItemController {
     /// MenuBarMetric, since its content comes from ClipboardHistoryService
     /// rather than a SystemSnapshot reading.
     private var clipboardPreviewStatusItem: NSStatusItem?
+    /// The running time entry, shaped like the clipboard preview: its own
+    /// opt-in item, alive only while an entry runs.
+    private var timeTrackingStatusItem: NSStatusItem?
+    /// Fires on the next minute boundary of the running entry, the only
+    /// moment its text changes.
+    private var timeTrackingTimer: Timer?
     private var metricStatusItems: [String: NSStatusItem] = [:]
     private var metricStatusItemFocus: [String: MenuBarMetric] = [:]
     private var cancellables = Set<AnyCancellable>()
@@ -57,9 +64,13 @@ final class StatusItemController {
     /// so bind() only touches it once the feature is actually available,
     /// rather than for every launch regardless of whether anyone uses it.
     private var clipboardBindingsInstalled = false
+    /// Same reason as `clipboardBindingsInstalled`: the time tracking service
+    /// reads its file when first referenced, so it waits for the feature.
+    private var timeTrackingBindingsInstalled = false
     private static let mainAutosaveName = "VorssaintMenuBarItem"
     private static let metricAutosavePrefix = "VorssaintMetric"
     private static let clipboardPreviewAutosaveName = "VorssaintClipboardPreview"
+    private static let timeTrackingAutosaveName = "VorssaintTimeTracking"
     private static let emptyStatusImage = NSImage()
 
     /// One separate menu bar item: a metric, or a metric with its temperature
@@ -82,7 +93,8 @@ final class StatusItemController {
     var button: NSStatusBarButton? { statusItem.button }
 
     func containsStatusItem(at screenPoint: NSPoint) -> Bool {
-        let items = [statusItem, clipboardPreviewStatusItem].compactMap { $0 } + Array(metricStatusItems.values)
+        let items = [statusItem, clipboardPreviewStatusItem, timeTrackingStatusItem].compactMap { $0 }
+            + Array(metricStatusItems.values)
         // A hidden item keeps its last frame, which another app's item may
         // occupy by now.
         let buttons = items.filter(\.isVisible).compactMap(\.button)
@@ -213,6 +225,7 @@ final class StatusItemController {
             .store(in: &cancellables)
 
         bindClipboardPreviewIfAvailable()
+        bindTimeTrackingIfAvailable()
 
         defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification,
                                                                   object: nil,
@@ -237,6 +250,8 @@ final class StatusItemController {
             self.refresh()
             self.bindClipboardPreviewIfAvailable()
             self.syncClipboardPreviewItem()
+            self.bindTimeTrackingIfAvailable()
+            self.syncTimeTrackingItem()
         }
     }
 
@@ -266,12 +281,16 @@ final class StatusItemController {
         // so a future "recreate the status item" path can't leak a firing timer or
         // a block observer that outlives this instance.
         titleTimer?.invalidate()
+        timeTrackingTimer?.invalidate()
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
         for item in metricStatusItems.values {
             NSStatusBar.system.removeStatusItem(item)
         }
         if let clipboardPreviewStatusItem {
             NSStatusBar.system.removeStatusItem(clipboardPreviewStatusItem)
+        }
+        if let timeTrackingStatusItem {
+            NSStatusBar.system.removeStatusItem(timeTrackingStatusItem)
         }
     }
 
@@ -430,7 +449,8 @@ final class StatusItemController {
     /// that is out of the bar has nowhere on screen to open from.
     func menuHost(for button: NSStatusBarButton?) -> NSStatusItem {
         guard !statusItem.isVisible, let button else { return statusItem }
-        let others = [clipboardPreviewStatusItem].compactMap { $0 } + Array(metricStatusItems.values)
+        let others = [clipboardPreviewStatusItem, timeTrackingStatusItem].compactMap { $0 }
+            + Array(metricStatusItems.values)
         return others.first { $0.button === button } ?? statusItem
     }
 
@@ -875,6 +895,103 @@ final class StatusItemController {
     private func removeClipboardPreviewStatusItem() {
         guard let item = clipboardPreviewStatusItem else { return }
         clipboardPreviewStatusItem = nil
+        NSStatusBar.system.removeStatusItem(item)
+    }
+
+    // MARK: - Time tracking item
+
+    private func bindTimeTrackingIfAvailable() {
+        guard !timeTrackingBindingsInstalled, AppFeature.timeTracking.isAvailable else { return }
+        timeTrackingBindingsInstalled = true
+        TimeTrackingService.shared.$log
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.syncTimeTrackingItem() }
+            .store(in: &cancellables)
+    }
+
+    /// Shows the running entry while there is one, hidden rather than removed
+    /// between entries so a position the person dragged it to survives.
+    private func syncTimeTrackingItem() {
+        timeTrackingTimer?.invalidate()
+        timeTrackingTimer = nil
+        // Checked before touching TimeTrackingService.shared, for the same
+        // reason as the clipboard preview: this runs on every settings change.
+        guard AppFeature.timeTracking.isAvailable,
+              UserDefaults.standard.bool(forKey: DefaultsKey.timeTrackingMenuBarTimer)
+        else {
+            removeTimeTrackingStatusItem()
+            return
+        }
+        let running = TimeTrackingService.shared.running
+        let item = timeTrackingStatusItem ?? installTimeTrackingStatusItem()
+        if item.isVisible != (running != nil) {
+            item.isVisible = running != nil
+        }
+        guard let running, let button = item.button else { return }
+        let now = Date()
+        let clock = TimeTrackingFormat.clock(running.duration(at: now))
+        let label = running.description.count > 18
+            ? String(running.description.prefix(17)) + "…"
+            : running.description
+        let text = label.isEmpty ? clock : "\(label) \(clock)"
+        if button.image !== Self.emptyStatusImage {
+            button.image = Self.emptyStatusImage
+        }
+        if button.imagePosition != .noImage {
+            button.imagePosition = .noImage
+        }
+        let font = MenuBarRenderer.statusFont(stacked: false)
+        if button.font?.isEqual(font) != true {
+            button.font = font
+        }
+        if button.title != text {
+            button.title = text
+        }
+        if button.toolTip != running.description {
+            button.toolTip = running.description
+        }
+        let fireDate = TimeTrackingFormat.nextMinuteBoundary(after: now, start: running.start)
+        let timer = Timer(fire: fireDate, interval: 0, repeats: false) { [weak self] _ in
+            self?.syncTimeTrackingItem()
+        }
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        timeTrackingTimer = timer
+    }
+
+    private func installTimeTrackingStatusItem() -> NSStatusItem {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.autosaveName = Self.timeTrackingAutosaveName
+        item.behavior = []
+        // Registered before it is shown, as with the clipboard preview.
+        timeTrackingStatusItem = item
+        item.isVisible = true
+        if let button = item.button {
+            button.font = MenuBarRenderer.statusFont(stacked: false)
+            button.alignment = .left
+            button.cell?.lineBreakMode = .byClipping
+            button.cell?.usesSingleLineMode = true
+            button.target = self
+            button.action = #selector(timeTrackingClicked)
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        return item
+    }
+
+    @objc private func timeTrackingClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            onRightClick?(timeTrackingStatusItem?.button)
+            return
+        }
+        guard let button = timeTrackingStatusItem?.button else { return }
+        onTimeTrackingClick?(button)
+    }
+
+    private func removeTimeTrackingStatusItem() {
+        timeTrackingTimer?.invalidate()
+        timeTrackingTimer = nil
+        guard let item = timeTrackingStatusItem else { return }
+        timeTrackingStatusItem = nil
         NSStatusBar.system.removeStatusItem(item)
     }
 }

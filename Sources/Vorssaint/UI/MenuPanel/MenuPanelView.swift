@@ -27,6 +27,9 @@ final class MenuPanelFocus: ObservableObject {
     @Published private(set) var activeMetric: MetricDetailKind?
     @Published private(set) var isSwitchingMetricAnchor = false
     @Published private(set) var popoverIsVisible = false
+    /// Set by the running timer's menu bar item. The Utilities section opens
+    /// Time Tracking when it next shows, and any other request clears it.
+    @Published var opensTimeTracking = false
     private var serial = 0
 
     private init() {}
@@ -34,6 +37,7 @@ final class MenuPanelFocus: ObservableObject {
     func showNormalPanel() {
         serial += 1
         activeMetric = nil
+        opensTimeTracking = false
         request = MenuPanelFocusRequest(target: .normal, serial: serial)
     }
 
@@ -43,9 +47,15 @@ final class MenuPanelFocus: ObservableObject {
         request = MenuPanelFocusRequest(target: .section(section), serial: serial)
     }
 
+    func focusTimeTracking() {
+        focus(.utilities)
+        opensTimeTracking = true
+    }
+
     func focus(_ metric: MetricDetailKind) {
         serial += 1
         activeMetric = metric
+        opensTimeTracking = false
         request = MenuPanelFocusRequest(target: .metric(metric), serial: serial)
     }
 
@@ -556,7 +566,7 @@ private enum UtilityPanelItem: String, PanelOrderItem, Identifiable {
     // are migrated once without disturbing the rest of the user's layout.
     case screenshot, quickLauncher, appUpdates, cleaner, homebrew, media, clipboard, windowLayout,
          uninstaller, cleanURL, cleaning, screenOCR, colorPicker, cameraPreview, scratchpad,
-         commandBar, screenRecorder, portManager
+         commandBar, screenRecorder, portManager, timeTracking
 
     var id: String { rawValue }
 
@@ -582,12 +592,14 @@ private enum UtilityPanelItem: String, PanelOrderItem, Identifiable {
         case .scratchpad: return .scratchpad
         case .commandBar: return .commandBar
         case .portManager: return .portManager
+        case .timeTracking: return .timeTracking
         }
     }
 }
 
 struct UtilitiesSection: View {
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var panelFocus = MenuPanelFocus.shared
     @ObservedObject private var permissions = Permissions.shared
     @ObservedObject private var features = FeatureRuntime.shared
     @State private var showUninstaller = false
@@ -600,6 +612,7 @@ struct UtilitiesSection: View {
     @State private var showRecentCapturesPanel = false
     @State private var showWindowLayoutPanel = false
     @State private var showPortManagerPanel = false
+    @State private var showTimeTrackingPanel = false
     @AppStorage(DefaultsKey.panelUtilityCleaning) private var showCleaning = true
     @AppStorage(DefaultsKey.panelUtilityURLCleaner) private var showCleanURL = true
     @AppStorage(DefaultsKey.panelUtilityUninstaller) private var showUninstallerAction = true
@@ -618,6 +631,7 @@ struct UtilitiesSection: View {
     @AppStorage(DefaultsKey.panelUtilityCommandBar) private var showCommandBar = true
     @AppStorage(DefaultsKey.panelUtilityScreenRecorder) private var showScreenRecorder = true
     @AppStorage(DefaultsKey.panelUtilityPortManager) private var showPortManager = true
+    @AppStorage(DefaultsKey.panelUtilityTimeTracking) private var showTimeTracking = true
     @ObservedObject private var recorder = ScreenRecorderService.shared
     @AppStorage(DefaultsKey.clipboardHistoryEnabled) private var clipboardEnabled = false
     @AppStorage(DefaultsKey.panelUtilityOrder) private var utilityOrderRaw = ""
@@ -676,6 +690,11 @@ struct UtilitiesSection: View {
                     PanelInteractionState.shared.viewKeepsPopoverOpen = false
                     showPortManagerPanel = false
                 }
+            } else if showTimeTrackingPanel {
+                PanelTimeTrackingView {
+                    PanelInteractionState.shared.viewKeepsPopoverOpen = false
+                    showTimeTrackingPanel = false
+                }
             } else {
                 PanelRowGroup(items: items(editing: editing), showsDragHandles: editing) { item in
                     PanelReorderableItem(item: item,
@@ -694,12 +713,21 @@ struct UtilitiesSection: View {
         .onChange(of: hostedSettingsPage) { _, page in
             PanelInteractionState.shared.hostedSettingsPage = page
         }
+        .onAppear(perform: openRequestedTimeTracking)
+        .onChange(of: panelFocus.opensTimeTracking) { _, _ in openRequestedTimeTracking() }
         .onDisappear {
             // Another section, or a metric, replacing this one takes the
             // tool off screen with it; a closed panel does not, and keeps it.
             PanelInteractionState.shared.viewKeepsPopoverOpen = false
             PanelInteractionState.shared.hostedSettingsPage = nil
         }
+    }
+
+    /// A tool already on screen stays; the request is used up either way.
+    private func openRequestedTimeTracking() {
+        guard panelFocus.opensTimeTracking else { return }
+        panelFocus.opensTimeTracking = false
+        if !isHostingUtility { showTimeTrackingPanel = true }
     }
 
     /// The Settings page that belongs to whichever tool the section is
@@ -727,6 +755,7 @@ struct UtilitiesSection: View {
         showUninstaller || showCleanerPanel || showURLCleaner || showHomebrewPanel
             || showMediaPanel || showClipboardPanel || showRecentCapturesPanel
             || showWindowLayoutPanel || showAppUpdatesPanel || showPortManagerPanel
+            || showTimeTrackingPanel
     }
 
     /// Homebrew browsing behaves like an ordinary popover. Other hosted tools
@@ -782,6 +811,7 @@ struct UtilitiesSection: View {
         case .screenshot: return showScreenshot
         case .screenRecorder: return showScreenRecorder
         case .portManager: return showPortManager
+        case .timeTracking: return showTimeTracking
         }
     }
 
@@ -1026,6 +1056,14 @@ struct UtilitiesSection: View {
                                 showsDragHandle: true,
                                 visibility: $showPortManager,
                                 action: { showPortManagerPanel = true })
+        case .timeTracking:
+            UtilityActionButton(title: FeatureStrings.timeTracking(l10n.language).title,
+                                caption: FeatureStrings.timeTracking(l10n.language).tileCaption,
+                                systemImage: AppFeature.timeTracking.symbolName,
+                                isEditing: editing,
+                                showsDragHandle: true,
+                                visibility: $showTimeTracking,
+                                action: { showTimeTrackingPanel = true })
         }
     }
 
@@ -1103,6 +1141,7 @@ struct UtilitiesSection: View {
         showQuickLauncher = true
         showCommandBar = true
         showPortManager = true
+        showTimeTracking = true
     }
 
     private func grantAccessibility() {

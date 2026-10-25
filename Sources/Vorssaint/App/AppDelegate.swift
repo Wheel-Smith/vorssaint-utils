@@ -133,6 +133,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             // any status item.
             ClipboardHistoryService.shared.toggleHistoryWindow()
         }
+        statusController.onTimeTrackingClick = { [weak self] button in
+            guard let self else { return }
+            self.captureStatusClick()
+            // Opens on the tool, where the running entry can be stopped.
+            if !self.popoverIsOpen { MenuPanelFocus.shared.focusTimeTracking() }
+            self.togglePopover(anchor: button)
+        }
         // The shelf drop zone chip anchors itself under the menu bar icon.
         ShelfService.shared.statusItemFrameProvider = { [weak self] in
             guard let item = self?.statusController.statusItem, item.isVisible,

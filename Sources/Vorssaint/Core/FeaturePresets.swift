@@ -152,6 +152,9 @@ extension AppFeature {
              .cameraPreview, .scratchpad, .commandBar, .screenRecorder, .wallpaper, .fanControl,
              .diskImageInstaller, .killProcess, .portManager:
             return .idle
+        // A running entry is only its start date; the optional menu bar
+        // timer redraws once a minute while one runs.
+        case .timeTracking: return .periodic
         case .appUpdates:
             // The list is on demand; only a background schedule keeps a timer.
             return AppUpdatesSupport.CheckFrequency.sanitized(

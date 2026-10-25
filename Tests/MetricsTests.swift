@@ -131,6 +131,7 @@ struct MetricsTests {
                 QuickTogglesAlertTests.run(suite)
                 PortManagerRefreshTests.run(suite)
             }),
+            ("time-tracking", { TimeTrackingTests.run(suite) }),
             ("settings", {
                 SettingsFeatureTests.run(suite)
                 SettingsWindowTests.run { suite.expect($0, $1) }
