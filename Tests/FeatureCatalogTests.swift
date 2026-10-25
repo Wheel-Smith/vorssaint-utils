@@ -2092,8 +2092,10 @@ enum FeatureCatalogTests {
                 && AppFeature.diskImageInstaller.settingsDestination
                 == FeatureSettingsDestination(.features),
                "features without dedicated pages use explicit nearest Settings destinations")
-        suite.expect(!AppFeature.diskImageInstaller.hasNavigableSettingsDestination
-                && AppFeature.allCases.filter { $0 != .diskImageInstaller }
+        // Time tracking lives entirely in its panel tool until it gains settings.
+        let withoutSettingsPage: Set<AppFeature> = [.diskImageInstaller, .timeTracking]
+        suite.expect(withoutSettingsPage.allSatisfy { !$0.hasNavigableSettingsDestination }
+                && AppFeature.allCases.filter { !withoutSettingsPage.contains($0) }
                     .allSatisfy(\.hasNavigableSettingsDestination),
                "a feature without a separate configuration surface does not show a dead-end link")
         suite.expect(AppFeature.monitorCPU.settingsDestination == FeatureSettingsDestination(.monitor)
