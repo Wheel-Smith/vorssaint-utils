@@ -36,6 +36,24 @@ struct TimeTrackingLog: Codable, Equatable {
 
     /// Oldest first.
     var entries: [TimeEntry] = []
+    /// Stretches away from the Mac while the running entry ran, oldest first,
+    /// waiting for the person to keep or discard them. Only ever about the
+    /// running entry: stopping it keeps them.
+    var away: [TimeAway] = []
+
+    init(entries: [TimeEntry] = [], away: [TimeAway] = []) {
+        self.entries = entries
+        self.away = away
+    }
+
+    /// Decoded a field at a time, so a file written before time away was
+    /// kept still loads. Here rather than beside the rest of time away,
+    /// because the synthesized coding keys are private to this file.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try container.decodeIfPresent([TimeEntry].self, forKey: .entries) ?? []
+        away = try container.decodeIfPresent([TimeAway].self, forKey: .away) ?? []
+    }
 
     var running: TimeEntry? { entries.last(where: \.isRunning) }
 
@@ -52,6 +70,7 @@ struct TimeTrackingLog: Codable, Equatable {
     /// A start in the future (the clock moved back) ends at its own start
     /// instead of before it.
     mutating func stop(at now: Date) {
+        away = []
         for index in entries.indices where entries[index].isRunning {
             entries[index].end = max(entries[index].start, now)
         }
@@ -75,6 +94,7 @@ struct TimeTrackingLog: Codable, Equatable {
     }
 
     mutating func delete(_ id: UUID) {
+        if running?.id == id { away = [] }
         entries.removeAll { $0.id == id }
     }
 
@@ -141,7 +161,9 @@ struct TimeTrackingLog: Codable, Equatable {
                 kept[index].end = kept[index].start
             }
         }
-        return TimeTrackingLog(entries: kept)
+        var repaired = TimeTrackingLog(entries: kept)
+        repaired.away = Self.repairedAway(away, for: repaired.running)
+        return repaired
     }
 
     private static func cleaned(_ text: String) -> String {

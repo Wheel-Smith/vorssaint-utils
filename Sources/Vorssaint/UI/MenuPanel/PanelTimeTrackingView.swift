@@ -28,6 +28,7 @@ struct PanelTimeTrackingView: View {
                     .panelCard()
             }
             if let running = service.running {
+                if !service.log.away.isEmpty { awayCard }
                 runningCard(running)
             } else {
                 startCard
@@ -83,6 +84,25 @@ struct PanelTimeTrackingView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
         }
+        .panelCard()
+    }
+
+    /// Asked after time away from the Mac while the entry ran; it stays
+    /// until answered or the entry stops, which keeps the time.
+    private var awayCard: some View {
+        let away = FeatureStrings.timeTrackingAway(l10n.language)
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(String(format: away.awayFormat, TimeTrackingFormat.clock(service.log.awayDuration)),
+                  systemImage: "zzz")
+                .font(.system(size: 11, weight: .medium))
+            HStack(spacing: 6) {
+                Button(away.keep) { service.keepAway() }
+                Button(away.discard) { service.discardAway(stopping: false) }
+                Button(away.discardAndStop) { service.discardAway(stopping: true) }
+            }
+            .controlSize(.small)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .panelCard()
     }
 

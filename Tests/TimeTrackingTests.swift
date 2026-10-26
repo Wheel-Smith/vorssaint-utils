@@ -179,6 +179,85 @@ enum TimeTrackingTests {
                          && !AppFeature.timeTracking.installedByDefault,
                      "time tracking is an opt-in tool that needs no permission")
 
+        // MARK: Time away
+
+        let nine = date("2026-10-20T09:00:00Z")
+        func at(_ minutes: Double) -> Date { nine.addingTimeInterval(minutes * 60) }
+        var away = TimeTrackingLog()
+        let awayID = away.start(description: "Docs", at: nine)
+        away.noteAway(from: at(10), to: at(14))
+        suite.expect(away.away.isEmpty, "a stretch under five minutes is not time away")
+        away.noteAway(from: at(-30), to: at(20))
+        suite.expect(away.away == [TimeAway(start: nine, end: at(20))],
+                     "only the part after the entry started counts as away")
+        away.noteAway(from: at(18), to: at(30))
+        away.noteAway(from: at(60), to: at(70))
+        suite.expect(away.away == [TimeAway(start: nine, end: at(30)), TimeAway(start: at(60), end: at(70))]
+                         && away.awayDuration == 40 * 60,
+                     "overlapping stretches join, separate ones stay apart")
+
+        var kept = away
+        kept.keepAway()
+        suite.expect(kept.away.isEmpty && kept.entries == away.entries,
+                     "keeping the time away leaves the entry untouched")
+
+        var discarded = away
+        var newIDs = [UUID(), UUID()]
+        discarded.discardAway(stopping: false, newID: { newIDs.removeFirst() })
+        suite.expect(discarded.away.isEmpty
+                         && discarded.entries.map(\.start) == [at(30), at(70)]
+                         && discarded.entries.map(\.end) == [at(60), nil]
+                         && discarded.entries.allSatisfy { $0.description == "Docs" },
+                     "discarding cuts the entry at each stretch and keeps it running after the last")
+        suite.expect(discarded.entries.first?.id == awayID,
+                     "the first piece keeps the entry's own id")
+
+        var discardedAndStopped = away
+        discardedAndStopped.discardAway(stopping: true)
+        suite.expect(discardedAndStopped.running == nil
+                         && discardedAndStopped.entries.map(\.end) == [at(60)],
+                     "discard and stop ends the entry where the last stretch began")
+
+        var stoppedAway = away
+        stoppedAway.stop(at: at(80))
+        suite.expect(stoppedAway.away.isEmpty && stoppedAway.entries.first?.end == at(80),
+                     "stopping keeps the time away")
+        var deletedAway = away
+        deletedAway.delete(awayID)
+        suite.expect(deletedAway.away.isEmpty, "deleting the running entry drops its time away")
+
+        let oldFile = Data(#"{"entries":[{"id":"\#(UUID().uuidString)","description":"Old","start":"2026-10-20T09:00:00Z"}]}"#.utf8)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decodedOld = try? decoder.decode(TimeTrackingLog.self, from: oldFile)
+        suite.expect(decodedOld?.running?.description == "Old" && decodedOld?.away.isEmpty == true,
+                     "a file written before time away was kept still loads")
+        var handEdited = away
+        handEdited.away.append(TimeAway(start: at(90), end: at(85)))
+        suite.expect(handEdited.sanitized().away == away.away,
+                     "a stretch that ends before it starts is dropped on load")
+        var orphaned = away
+        orphaned.entries[0].end = at(80)
+        suite.expect(orphaned.sanitized().away.isEmpty,
+                     "time away without a running entry is dropped on load")
+
+        var tracker = TimeTrackingAwayTracker()
+        tracker.begin(.lock, at: at(0))
+        tracker.begin(.sleep, at: at(1))
+        suite.expect(tracker.end(.sleep, at: at(30)) == nil
+                         && tracker.end(.lock, at: at(31)) == TimeAway(start: at(0), end: at(31)),
+                     "overlapping reasons make one stretch, from the first start to the last end")
+        suite.expect(tracker.end(.lock, at: at(40)) == nil,
+                     "an end without its start is ignored")
+        let cutoff = TimeTrackingLog.awayCutoff
+        suite.expect(tracker.idle(120, at: at(50), cutoff: cutoff) == nil && tracker.reasons.isEmpty,
+                     "two minutes without input is not idling")
+        suite.expect(tracker.idle(6 * 60, at: at(56), cutoff: cutoff) == nil
+                         && tracker.since == at(50),
+                     "idling starts at the last input once it is five minutes old")
+        suite.expect(tracker.idle(30, at: at(80), cutoff: cutoff) == TimeAway(start: at(50), end: at(79.5)),
+                     "idling ends at the input that broke it")
+
         // MARK: Command Bar and shortcut
 
         for language in AppLanguage.allCases {
@@ -193,6 +272,17 @@ enum TimeTrackingTests {
                 suite.expect(commands.startTimer != TimeTrackingCommandStrings.enUS.startTimer
                                  && commands.shortcutTitle != TimeTrackingCommandStrings.enUS.shortcutTitle,
                              "the command names are translated (\(language.rawValue))")
+            }
+        }
+        for language in AppLanguage.allCases {
+            let strings = FeatureStrings.timeTrackingAway(language)
+            let values = Mirror(reflecting: strings).children.compactMap { $0.value as? String }
+            suite.expect(values.allSatisfy { !$0.isEmpty && !$0.contains("\u{2014}") && !$0.contains("...") }
+                             && strings.awayFormat.components(separatedBy: "%@").count == 2,
+                         "the time away question is complete and names the time once (\(language.rawValue))")
+            if language != .enUS {
+                suite.expect(strings.discardAndStop != TimeTrackingAwayStrings.enUS.discardAndStop,
+                             "the time away question is translated (\(language.rawValue))")
             }
         }
         let role = GlobalShortcutRole.timeTracking

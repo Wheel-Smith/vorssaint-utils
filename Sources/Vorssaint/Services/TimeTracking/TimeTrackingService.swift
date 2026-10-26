@@ -49,6 +49,18 @@ final class TimeTrackingService: ObservableObject {
         mutate { $0.delete(id) }
     }
 
+    func noteAway(_ stretch: TimeAway) {
+        mutate { $0.noteAway(from: stretch.start, to: stretch.end) }
+    }
+
+    func keepAway() {
+        mutate { $0.keepAway() }
+    }
+
+    func discardAway(stopping: Bool) {
+        mutate { $0.discardAway(stopping: stopping) }
+    }
+
     private func load() {
         do {
             log = try store.load()

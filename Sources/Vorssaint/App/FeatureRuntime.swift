@@ -379,7 +379,10 @@ final class FeatureRuntime: ObservableObject {
             if AppFeature.notch.isAvailable { NotchService.shared.syncWithPreferences() }
         },
         .scratchpad: { ScratchpadService.shared.syncWithPreferences() },
-        .timeTracking: { TimeTrackingCommands.shared.syncWithPreferences() },
+        .timeTracking: {
+            TimeTrackingCommands.shared.syncWithPreferences()
+            TimeTrackingAwayWatcher.shared.sync()
+        },
         .commandBar: { CommandBarService.shared.syncWithPreferences() },
         .cleaner: {
             CleanerScheduler.shared.syncWithPreferences()
