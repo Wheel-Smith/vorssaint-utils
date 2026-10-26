@@ -166,7 +166,7 @@ struct TimeTrackingLog: Codable, Equatable {
         return repaired
     }
 
-    private static func cleaned(_ text: String) -> String {
+    static func cleaned(_ text: String) -> String {
         let singleLine = text.components(separatedBy: .newlines).joined(separator: " ")
         return String(singleLine.trimmingCharacters(in: .whitespaces).prefix(maximumDescriptionLength))
     }

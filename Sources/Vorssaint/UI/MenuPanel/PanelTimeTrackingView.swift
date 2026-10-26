@@ -11,11 +11,18 @@ struct PanelTimeTrackingView: View {
     @State private var period = AgentPeriod.today
     @State private var renamingID: UUID?
     @State private var renameText = ""
+    /// The entry whose times are being corrected, in place like a rename.
+    @State private var editingID: UUID?
+    @State private var isAdding = false
+    @State private var addName = ""
+    @State private var editStart = Date()
+    @State private var editEnd = Date()
 
     /// nil on the island's own page, whose band already names it.
     var onClose: (() -> Void)? = nil
 
     private var strings: TimeTrackingFeatureStrings { FeatureStrings.timeTracking(l10n.language) }
+    private var edit: TimeTrackingEditStrings { FeatureStrings.timeTrackingEdit(l10n.language) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -29,7 +36,11 @@ struct PanelTimeTrackingView: View {
             }
             if let running = service.running {
                 if !service.log.away.isEmpty { awayCard }
-                runningCard(running)
+                if editingID == running.id {
+                    timesEditor(running)
+                } else {
+                    runningCard(running)
+                }
             } else {
                 startCard
             }
@@ -47,6 +58,8 @@ struct PanelTimeTrackingView: View {
             if onClose != nil { PanelInteractionState.shared.viewKeepsPopoverOpen = false }
             // Escape on the island steps back before the field sees it.
             renamingID = nil
+            editingID = nil
+            isAdding = false
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -85,6 +98,9 @@ struct PanelTimeTrackingView: View {
                 .controlSize(.small)
         }
         .panelCard()
+        .contextMenu {
+            Button(edit.editStart) { beginEditing(entry) }
+        }
     }
 
     /// Asked after time away from the Mac while the entry ran; it stays
@@ -190,15 +206,29 @@ struct PanelTimeTrackingView: View {
 
     // MARK: Recent
 
-    @ViewBuilder
     private var recentList: some View {
         let recent = service.log.recent(limit: 5)
-        if !recent.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(strings.recent)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                ForEach(recent) { entry in
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                if !recent.isEmpty {
+                    Text(strings.recent)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(action: beginAdding) {
+                    Image(systemName: "plus").font(.system(size: 10))
+                }
+                .buttonStyle(.borderless)
+                .disabled(isAdding)
+                .help(edit.addEntry)
+                .accessibilityLabel(edit.addEntry)
+            }
+            if isAdding { addEditor }
+            ForEach(recent) { entry in
+                if editingID == entry.id {
+                    timesEditor(entry)
+                } else {
                     recentRow(entry)
                 }
             }
@@ -243,12 +273,119 @@ struct PanelTimeTrackingView: View {
         .contextMenu {
             Button(strings.continueEntry) { service.continueEntry(entry.id) }
             Button(strings.rename) {
+                editingID = nil
+                isAdding = false
                 renameText = entry.description
                 renamingID = entry.id
             }
+            Button(edit.editTimes) { beginEditing(entry) }
             Divider()
             Button(strings.delete, role: .destructive) { service.delete(entry.id) }
         }
+    }
+
+    // MARK: Correcting times
+
+    /// The newest entry of a Recent row, like Delete, or the running one,
+    /// which only takes a new start.
+    private func timesEditor(_ entry: TimeEntry) -> some View {
+        let end = entry.isRunning ? nil : editEnd
+        return timesCard(problem: service.log.problem(editing: entry.id, start: editStart, end: end, now: Date()),
+                         showsEnd: !entry.isRunning,
+                         onSave: {
+                             service.setTimes(entry.id, start: editStart, end: end)
+                             editingID = nil
+                         },
+                         onCancel: { editingID = nil }) {
+            Text(name(entry.description))
+                .font(.system(size: 10.5, weight: .semibold))
+                .lineLimit(1)
+        }
+    }
+
+    private var addEditor: some View {
+        timesCard(problem: service.log.problem(editing: nil, start: editStart, end: editEnd, now: Date()),
+                  showsEnd: true,
+                  onSave: {
+                      service.addEntry(description: addName, start: editStart, end: editEnd)
+                      isAdding = false
+                  },
+                  onCancel: { isAdding = false }) {
+            TextField(strings.descriptionPlaceholder, text: $addName)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 10.5))
+        }
+    }
+
+    private func timesCard<Title: View>(problem: TimeEntryEditProblem?,
+                                        showsEnd: Bool,
+                                        onSave: @escaping () -> Void,
+                                        onCancel: @escaping () -> Void,
+                                        @ViewBuilder title: () -> Title) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            title()
+            timeRow(edit.startLabel, selection: $editStart)
+            if showsEnd { timeRow(edit.endLabel, selection: $editEnd) }
+            if let problem {
+                Text(message(for: problem))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 6) {
+                Spacer()
+                Button(edit.cancel, action: onCancel)
+                Button(edit.save, action: onSave)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(problem != nil)
+            }
+            .controlSize(.small)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .panelCard()
+    }
+
+    private func timeRow(_ label: String, selection: Binding<Date>) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 6)
+            DatePicker(label, selection: selection, displayedComponents: [.date, .hourAndMinute])
+                .datePickerStyle(.field)
+                .controlSize(.small)
+                .labelsHidden()
+                .fixedSize()
+        }
+    }
+
+    private func message(for problem: TimeEntryEditProblem) -> String {
+        switch problem {
+        case .endBeforeStart: return edit.endBeforeStart
+        case .inFuture: return edit.inFuture
+        case .overlaps: return edit.overlaps
+        }
+    }
+
+    private func beginEditing(_ entry: TimeEntry) {
+        renamingID = nil
+        isAdding = false
+        editStart = entry.start
+        editEnd = entry.end ?? Date()
+        editingID = entry.id
+    }
+
+    /// Starts as the half hour that ended at the last whole minute: the
+    /// usual case is work done without starting the timer.
+    private func beginAdding() {
+        renamingID = nil
+        editingID = nil
+        let minute = Date(timeIntervalSinceReferenceDate:
+            (Date().timeIntervalSinceReferenceDate / 60).rounded(.down) * 60)
+        editEnd = minute
+        editStart = minute.addingTimeInterval(-30 * 60)
+        addName = ""
+        isAdding = true
     }
 
     // MARK: Helpers

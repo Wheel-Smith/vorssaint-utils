@@ -258,6 +258,37 @@ enum TimeTrackingTests {
         suite.expect(tracker.idle(30, at: at(80), cutoff: cutoff) == TimeAway(start: at(50), end: at(79.5)),
                      "idling ends at the input that broke it")
 
+        // MARK: Correcting times
+
+        var edited = TimeTrackingLog()
+        let morning = edited.start(description: "Morning", at: at(0))
+        edited.stop(at: at(60))
+        let noonRun = edited.start(description: "Afternoon", at: at(120))
+        let late = at(180)
+        suite.expect(edited.problem(editing: morning, start: at(10), end: at(5), now: late) == .endBeforeStart
+                         && edited.problem(editing: morning, start: at(10), end: at(200), now: late) == .inFuture
+                         && edited.problem(editing: morning, start: at(10), end: at(130), now: late) == .overlaps
+                         && edited.problem(editing: morning, start: at(-30), end: at(90), now: late) == nil,
+                     "a correction is refused when it ends first, reaches the future or overlaps another entry")
+        suite.expect(edited.problem(editing: nil, start: at(150), end: at(170), now: late) == .overlaps,
+                     "the running entry counts as ending now")
+        suite.expect(edited.setTimes(morning, start: at(-30), end: at(90), now: late)
+                         && edited.entries.first?.start == at(-30) && edited.entries.first?.end == at(90),
+                     "a stopped entry takes new start and end times")
+        suite.expect(!edited.setTimes(morning, start: at(-30), end: nil, now: late)
+                         && !edited.setTimes(noonRun, start: at(100), end: at(110), now: late),
+                     "a stopped entry cannot be made to run, nor a running one stopped by editing")
+        edited.noteAway(from: at(120), to: at(140))
+        suite.expect(edited.setTimes(noonRun, start: at(130), end: nil, now: late)
+                         && edited.running?.start == at(130)
+                         && edited.away == [TimeAway(start: at(130), end: at(140))],
+                     "a later start trims time away from before it")
+        let added = edited.addEntry(description: "  Lunch ", start: at(95), end: at(115), now: late)
+        suite.expect(added != nil && edited.entries.map(\.description) == ["Morning", "Lunch", "Afternoon"],
+                     "a past entry is added in its place, with its name cleaned")
+        suite.expect(edited.addEntry(description: "Clash", start: at(100), end: at(125), now: late) == nil,
+                     "a past entry that overlaps another is refused")
+
         // MARK: Command Bar and shortcut
 
         for language in AppLanguage.allCases {
@@ -283,6 +314,17 @@ enum TimeTrackingTests {
             if language != .enUS {
                 suite.expect(strings.discardAndStop != TimeTrackingAwayStrings.enUS.discardAndStop,
                              "the time away question is translated (\(language.rawValue))")
+            }
+        }
+        for language in AppLanguage.allCases {
+            let strings = FeatureStrings.timeTrackingEdit(language)
+            let values = Mirror(reflecting: strings).children.compactMap { $0.value as? String }
+            suite.expect(values.allSatisfy { !$0.isEmpty && !$0.contains("\u{2014}") && !$0.contains("...") },
+                         "the time editor's text is complete (\(language.rawValue))")
+            if language != .enUS {
+                suite.expect(strings.editStart != TimeTrackingEditStrings.enUS.editStart
+                                 && strings.overlaps != TimeTrackingEditStrings.enUS.overlaps,
+                             "the time editor is translated (\(language.rawValue))")
             }
         }
         let role = GlobalShortcutRole.timeTracking
