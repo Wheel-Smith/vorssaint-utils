@@ -140,6 +140,7 @@ Reorder or hide panel sections, choose a compact layout, and export settings to 
 - **Quick toggles.** Switch appearance, hide desktop icons, eject disks, empty the Trash, lock the screen and more.
 - **Radial menu.** Open a customizable wheel of apps, files, shortcuts and tools around the pointer, with profiles and submenus.
 - **Scratchpad.** Keep autosaved notes in tabs, with Markdown preview and export, in a floating window or Dynamic Island.
+- **Time tracking.** Start named timers from the menu bar panel and see totals per name for today, 7 days and 30 days, with an optional menu bar timer. Entries stay on your Mac.
 - **Cleaning Mode.** Lock keyboard input while cleaning, with a black screen or a small visible indicator.
 
 ### Capture and create
