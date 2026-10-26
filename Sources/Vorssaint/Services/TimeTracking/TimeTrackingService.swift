@@ -49,6 +49,14 @@ final class TimeTrackingService: ObservableObject {
         mutate { $0.delete(id) }
     }
 
+    func setTimes(_ id: UUID, start: Date, end: Date?) {
+        mutate { $0.setTimes(id, start: start, end: end, now: Date()) }
+    }
+
+    func addEntry(description: String, start: Date, end: Date) {
+        mutate { $0.addEntry(description: description, start: start, end: end, now: Date()) }
+    }
+
     func noteAway(_ stretch: TimeAway) {
         mutate { $0.noteAway(from: stretch.start, to: stretch.end) }
     }
