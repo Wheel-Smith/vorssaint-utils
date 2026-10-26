@@ -78,9 +78,8 @@ struct NotchTimeTrackingStrip: View {
         .accessibilityIdentifier("notch.timeTracking")
     }
 
-    /// The module's own colour in the island editor, so the icon is told
-    /// apart from the timer's orange and Keep Awake's yellow.
-    static let tint = Color(red: 0.6, green: 0.76, blue: 0.2)
+    /// The island timer's orange: both strips count time.
+    static let tint = Color.orange
 
     /// The entry read aloud, since the strip does not show it.
     static func label(_ entry: TimeEntry, language: AppLanguage) -> String {

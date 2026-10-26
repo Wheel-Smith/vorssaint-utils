@@ -408,7 +408,7 @@ extension NotchModule {
         case .agents: return Color(red: 0.85, green: 0.47, blue: 0.34)
         case .watch: return .purple
         // Every named colour has a section; a lime keeps it apart from them.
-        case .timeTracking: return NotchTimeTrackingStrip.tint
+        case .timeTracking: return Color(red: 0.6, green: 0.76, blue: 0.2)
         }
     }
 
