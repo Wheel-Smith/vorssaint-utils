@@ -12,6 +12,7 @@ struct ShortcutsSettings: View {
     @ObservedObject private var superKey = SuperKeyService.shared
     @ObservedObject private var router = SettingsRouter.shared
     @AppStorage(DefaultsKey.keyboardBrightnessShortcutsEnabled) private var keyboardBrightnessShortcutsEnabled = false
+    @AppStorage(DefaultsKey.timeTrackingShortcutEnabled) private var timeTrackingShortcutEnabled = false
     /// Keyed by group too: brightness has a row in two groups, and each opens on its own.
     @State private var expandedFeatures: [FeatureGroup: Set<AppFeature>] = [.tools: [.screenshot]]
     @State private var showsAppShortcuts = false
@@ -153,6 +154,10 @@ struct ShortcutsSettings: View {
                 }
             }
         } else if let role = roles.first {
+            // Time Tracking has no page of its own to hold the switch.
+            if feature == .timeTracking {
+                TimeTrackingShortcutToggle(isEnabled: $timeTrackingShortcutEnabled)
+            }
             roleRow(role)
         }
     }
@@ -294,6 +299,24 @@ private struct KeyboardBrightnessShortcutToggle: View {
                 brightness.syncWithPreferences()
             }
         if isEnabled, brightness.keyboardBrightnessShortcutRegistrationFailed {
+            Text(l10n.s.shortcutUnavailable)
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+    }
+}
+
+private struct TimeTrackingShortcutToggle: View {
+    @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var commands = TimeTrackingCommands.shared
+    @Binding var isEnabled: Bool
+
+    var body: some View {
+        Toggle(l10n.s.quickToolShortcutToggle, isOn: $isEnabled)
+            .onChange(of: isEnabled) { _, _ in
+                commands.syncWithPreferences()
+            }
+        if isEnabled, commands.shortcutRegistrationFailed {
             Text(l10n.s.shortcutUnavailable)
                 .font(.caption)
                 .foregroundStyle(.orange)

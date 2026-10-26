@@ -423,6 +423,10 @@ enum CommandBarCatalog {
                 shortcut: roleShortcut(.scratchpad),
                 run: { _ in afterBeat { ScratchpadService.shared.show() } }))
         }
+        if AppFeature.timeTracking.isAvailable {
+            entries.append(contentsOf: timeTrackingEntries(area: area(.timeTracking),
+                                                           shortcut: roleShortcut(.timeTracking)))
+        }
         if AppFeature.cameraPreview.isAvailable {
             entries.append(CommandBarEntry(
                 id: "action.cameraPreview",
@@ -1361,6 +1365,61 @@ enum CommandBarCatalog {
             return
         }
         CommandBarTyping.post(text: text, attempt: 0)
+    }
+
+    // MARK: - Time tracking
+
+    /// Start reads whatever is typed after its name as the entry's name, so
+    /// "start timer write docs" is one step; with nothing after it the entry
+    /// is untitled, as in the panel. Stop is there only while an entry runs,
+    /// and each recent name has a row that continues it. The shortcut hint
+    /// sits on the row that does what the shortcut would do right now.
+    private static func timeTrackingEntries(area: String,
+                                            shortcut: GlobalShortcut?) -> [CommandBarEntry] {
+        let language = L10n.shared.language
+        let strings = FeatureStrings.timeTrackingCommands(language)
+        let keywords = FeatureStrings.timeTracking(language).title
+        let commands = TimeTrackingCommands.shared
+        let tracking = TimeTrackingService.shared
+        let running = tracking.running
+        let recent = tracking.log.recent(limit: 5).filter {
+            $0.description.lowercased() != running?.description.lowercased()
+        }
+        var entries = [CommandBarEntry(
+            id: "action.timeTracking.start",
+            title: strings.startTimer,
+            subtitle: area,
+            keywords: keywords,
+            icon: .symbol(AppFeature.timeTracking.symbolName),
+            shortcut: running == nil && recent.isEmpty ? shortcut : nil,
+            takesArgument: true,
+            run: { _ in
+                let typed = CommandBarService.shared.queryWhenRun.trimmingCharacters(in: .whitespaces)
+                let name = CommandBarLinks.trailingArgument(query: typed, name: strings.startTimer) ?? ""
+                commands.start(description: name)
+            })]
+        if running != nil {
+            entries.append(CommandBarEntry(
+                id: "action.timeTracking.stop",
+                title: strings.stopTimer,
+                subtitle: area,
+                keywords: keywords,
+                icon: .symbol("stop.fill"),
+                shortcut: shortcut,
+                isActive: true,
+                run: { _ in commands.stop() }))
+        }
+        for (index, entry) in recent.enumerated() {
+            entries.append(CommandBarEntry(
+                id: "action.timeTracking.continue.\(entry.description.lowercased())",
+                title: String(format: strings.continueFormat, commands.name(of: entry)),
+                subtitle: area,
+                keywords: keywords,
+                icon: .symbol("play.fill"),
+                shortcut: running == nil && index == 0 ? shortcut : nil,
+                run: { _ in commands.continueEntry(entry.id) }))
+        }
+        return entries
     }
 
     // MARK: - The places the person saved

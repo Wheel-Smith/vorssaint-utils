@@ -742,6 +742,8 @@ enum DefaultsKey {
     static let panelUtilityTimeTracking = "panelUtilityTimeTracking"
     static let timeTrackingMenuBarTimer = "timeTrackingMenuBarTimer" // running entry next to the menu bar icon
     static let timeTrackingFollowsPomodoro = "timeTrackingFollowsPomodoro" // island Pomodoro focus phases run the latest entry
+    static let timeTrackingShortcutEnabled = "timeTrackingShortcutEnabled"
+    static let timeTrackingShortcut = "timeTrackingShortcut" // starts or stops the timer from anywhere
 
     // Window Layout — snapping, global shortcuts and optional pointer gestures.
     static let windowLayoutShortcutsEnabled = "windowLayoutShortcutsEnabled"
@@ -1861,6 +1863,8 @@ enum Defaults {
         DefaultsKey.panelUtilityTimeTracking: true,
         DefaultsKey.timeTrackingMenuBarTimer: true,
         DefaultsKey.timeTrackingFollowsPomodoro: true,
+        DefaultsKey.timeTrackingShortcutEnabled: false,
+        DefaultsKey.timeTrackingShortcut: GlobalShortcut.timeTrackingDefault.storageValue,
         DefaultsKey.screenshotShowCaptureMenuOnShortcut: true,
         DefaultsKey.recorderShowCaptureMenuOnShortcut: true,
         DefaultsKey.screenOCRShowCaptureMenuOnShortcut: true,

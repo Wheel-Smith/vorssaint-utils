@@ -412,6 +412,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/PortManagerStrings.swift
         Sources/Vorssaint/Core/TimeTrackingStrings.swift
         Sources/Vorssaint/Core/TimeTrackingIslandStrings.swift
+        Sources/Vorssaint/Core/TimeTrackingCommandStrings.swift
         Sources/Vorssaint/Core/WhatsAppDownloadStrings.swift
         Sources/Vorssaint/Core/WhatsAppOrganizerStrings.swift
         Sources/Vorssaint/Core/ReleaseNotes.swift

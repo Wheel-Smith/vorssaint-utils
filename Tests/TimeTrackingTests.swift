@@ -178,5 +178,31 @@ enum TimeTrackingTests {
         suite.expect(AppFeature.timeTracking.group == .tools && AppFeature.timeTracking.permissions.isEmpty
                          && !AppFeature.timeTracking.installedByDefault,
                      "time tracking is an opt-in tool that needs no permission")
+
+        // MARK: Command Bar and shortcut
+
+        for language in AppLanguage.allCases {
+            let commands = FeatureStrings.timeTrackingCommands(language)
+            let values = Mirror(reflecting: commands).children.compactMap { $0.value as? String }
+            suite.expect(values.allSatisfy { !$0.isEmpty && !$0.contains("\u{2014}") && !$0.contains("...") },
+                         "time tracking command strings are complete, without em dashes or three periods (\(language.rawValue))")
+            let formats = [commands.continueFormat, commands.startedFormat, commands.stoppedFormat]
+            suite.expect(formats.allSatisfy { $0.components(separatedBy: "%@").count == 2 },
+                         "each command format names the entry exactly once (\(language.rawValue))")
+            if language != .enUS {
+                suite.expect(commands.startTimer != TimeTrackingCommandStrings.enUS.startTimer
+                                 && commands.shortcutTitle != TimeTrackingCommandStrings.enUS.shortcutTitle,
+                             "the command names are translated (\(language.rawValue))")
+            }
+        }
+        let role = GlobalShortcutRole.timeTracking
+        suite.expect(role.feature == .timeTracking && role.defaultShortcut == .timeTrackingDefault
+                         && role.storageKey == DefaultsKey.timeTrackingShortcut
+                         && role.requiredEnableKeys == [DefaultsKey.timeTrackingShortcutEnabled],
+                     "the start or stop shortcut is wired to its own keys and the time tracking feature")
+        suite.expect(Defaults.registeredDefaults[DefaultsKey.timeTrackingShortcutEnabled] as? Bool == false
+                         && Defaults.registeredDefaults[DefaultsKey.timeTrackingShortcut] as? String
+                         == GlobalShortcut.timeTrackingDefault.storageValue,
+                     "the shortcut starts switched off, on its own default combination")
     }
 }
