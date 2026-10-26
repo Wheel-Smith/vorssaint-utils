@@ -415,6 +415,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/TimeTrackingCommandStrings.swift
         Sources/Vorssaint/Core/TimeTrackingAwayStrings.swift
         Sources/Vorssaint/Core/TimeTrackingEditStrings.swift
+        Sources/Vorssaint/Core/TimeTrackingExportStrings.swift
         Sources/Vorssaint/Core/WhatsAppDownloadStrings.swift
         Sources/Vorssaint/Core/WhatsAppOrganizerStrings.swift
         Sources/Vorssaint/Core/ReleaseNotes.swift
@@ -550,6 +551,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/TimeTracking/TimeTrackingSupport.swift
         Sources/Vorssaint/Services/TimeTracking/TimeTrackingAwaySupport.swift
         Sources/Vorssaint/Services/TimeTracking/TimeTrackingEditSupport.swift
+        Sources/Vorssaint/Services/TimeTracking/TimeTrackingCSV.swift
         Sources/Vorssaint/Services/TimeTracking/TimeTrackingStore.swift
         Sources/Vorssaint/Services/Metrics/NetworkProcessSupport.swift
         Sources/Vorssaint/Services/Metrics/NetworkSampler.swift

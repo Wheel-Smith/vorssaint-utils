@@ -216,6 +216,15 @@ struct PanelTimeTrackingView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if !service.log.entries.isEmpty {
+                    let export = FeatureStrings.timeTrackingExport(l10n.language).exportCSV
+                    Button { TimeTrackingExport.run(fromIsland: onClose == nil) } label: {
+                        Image(systemName: "square.and.arrow.up").font(.system(size: 10))
+                    }
+                    .buttonStyle(.borderless)
+                    .help(export)
+                    .accessibilityLabel(export)
+                }
                 Button(action: beginAdding) {
                     Image(systemName: "plus").font(.system(size: 10))
                 }

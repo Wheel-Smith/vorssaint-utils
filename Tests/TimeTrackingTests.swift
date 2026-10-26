@@ -289,6 +289,25 @@ enum TimeTrackingTests {
         suite.expect(edited.addEntry(description: "Clash", start: at(100), end: at(125), now: late) == nil,
                      "a past entry that overlaps another is refused")
 
+        // MARK: CSV export
+
+        var exported = TimeTrackingLog()
+        exported.start(description: "Write, \"docs\"", at: date("2026-10-20T09:10:00Z"))
+        exported.stop(at: date("2026-10-20T10:04:30Z"))
+        exported.start(description: "=SUM(A1)", at: date("2026-10-20T23:50:00Z"))
+        let csv = TimeTrackingCSV.make(exported, header: TimeTrackingExportStrings.enUS.header,
+                                       now: date("2026-10-21T00:20:00Z"), timeZone: TimeZone(identifier: "UTC")!)
+        suite.expect(csv == "Description,Start date,Start time,End date,End time,Minutes\r\n"
+                         + "\"Write, \"\"docs\"\"\",2026-10-20,09:10,2026-10-20,10:04,55\r\n"
+                         + "'=SUM(A1),2026-10-20,23:50,,,30\r\n",
+                     "the CSV quotes commas and quotes, keeps formulas as text, rounds minutes up and leaves a running end empty")
+        suite.expect(TimeTrackingCSV.data("a").starts(with: [0xEF, 0xBB, 0xBF]),
+                     "the file starts with a byte order mark so spreadsheets read it as UTF-8")
+        suite.expect(TimeTrackingCSV.fileName(title: "Time Tracking", date: date("2026-10-20T12:00:00Z"),
+                                              timeZone: TimeZone(identifier: "UTC")!)
+                         == "Time Tracking 2026-10-20.csv",
+                     "the file is named after the feature and the day")
+
         // MARK: Command Bar and shortcut
 
         for language in AppLanguage.allCases {
@@ -325,6 +344,18 @@ enum TimeTrackingTests {
                 suite.expect(strings.editStart != TimeTrackingEditStrings.enUS.editStart
                                  && strings.overlaps != TimeTrackingEditStrings.enUS.overlaps,
                              "the time editor is translated (\(language.rawValue))")
+            }
+        }
+        for language in AppLanguage.allCases {
+            let strings = FeatureStrings.timeTrackingExport(language)
+            let values = Mirror(reflecting: strings).children.compactMap { $0.value as? String }
+            suite.expect(values.allSatisfy { !$0.isEmpty && !$0.contains("\u{2014}") && !$0.contains("...") }
+                             && strings.header.allSatisfy { !$0.contains(",") }
+                             && strings.exportCSV.hasSuffix("…"),
+                         "the CSV export's text is complete (\(language.rawValue))")
+            if language != .enUS {
+                suite.expect(strings.exportFailed != TimeTrackingExportStrings.enUS.exportFailed,
+                             "the CSV export is translated (\(language.rawValue))")
             }
         }
         let role = GlobalShortcutRole.timeTracking
